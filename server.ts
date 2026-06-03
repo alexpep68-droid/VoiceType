@@ -3,15 +3,23 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 
-// Initialize Gemini API Client
-const ai = new GoogleGenAI({ 
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
+let aiClient: GoogleGenAI | null = null;
+function getAiClient() {
+  if (!aiClient) {
+    if (!process.env.GEMINI_API_KEY) {
+      throw new Error("GEMINI_API_KEY environment variable is missing");
     }
+    aiClient = new GoogleGenAI({ 
+      apiKey: process.env.GEMINI_API_KEY,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
   }
-});
+  return aiClient;
+}
 
 async function startServer() {
   const app = express();
@@ -59,6 +67,7 @@ Intent & Formatting:
 
       systemPrompt += `\n\nReturn only the final polished text containing exactly the intended message. Do not add conversational padding like "Here is the text".`;
 
+      const ai = getAiClient();
       const response = await ai.models.generateContent({
         model: "gemini-3.5-flash",
         contents: [

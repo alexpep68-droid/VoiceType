@@ -15,6 +15,8 @@ export function useSpeechRecognition() {
   
   const recognitionRef = useRef<any>(null);
 
+  const [errorMsg, setErrorMsg] = useState<string>('');
+
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -57,6 +59,13 @@ export function useSpeechRecognition() {
 
     recognition.onerror = (event: any) => {
       console.error('Speech recognition error', event.error);
+      if (event.error === 'not-allowed') {
+        setErrorMsg('Permiso de micrófono denegado. Por favor, permítelo en tu navegador.');
+      } else if (event.error === 'network') {
+        setErrorMsg('Error de red o de API de voz no disponible.');
+      } else {
+        setErrorMsg(`Error de micrófono: ${event.error}`);
+      }
       setIsListening(false);
     };
 
@@ -77,15 +86,22 @@ export function useSpeechRecognition() {
 
   const startListening = useCallback(() => {
     if (recognitionRef.current && !isListening) {
+      setErrorMsg(''); // Clear error
       setTranscript(''); // Clear previous
-      recognitionRef.current.start();
-      setIsListening(true);
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (err) {
+        console.error('Failed to start', err);
+      }
     }
   }, [isListening]);
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current && isListening) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch(err){}
       setIsListening(false);
     }
   }, [isListening]);
@@ -94,6 +110,7 @@ export function useSpeechRecognition() {
     isListening,
     transcript,
     isSupported,
+    errorMsg,
     startListening,
     stopListening
   };

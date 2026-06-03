@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import type { Dictation, Tone, DictionaryItem } from './types';
 
 export default function App() {
-  const { isListening, transcript, isSupported, startListening, stopListening } = useSpeechRecognition();
+  const { isListening, transcript, isSupported, errorMsg, startListening, stopListening } = useSpeechRecognition();
   
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [activeTone, setActiveTone] = useState<Tone>('natural');
@@ -19,6 +19,8 @@ export default function App() {
   const [hasCopied, setHasCopied] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   
+  const [apiError, setApiError] = useState<string>('');
+
   const [stats, setStats] = useState({
     wpm: 0,
     wordsDictated: 0,
@@ -74,6 +76,7 @@ export default function App() {
   };
 
   const handleMicToggle = async () => {
+    setApiError('');
     if (isListening) {
       stopListening();
       if (transcript.trim()) {
@@ -87,6 +90,7 @@ export default function App() {
 
   const polishText = async (text: string, commandOverride?: string) => {
     setIsPolishing(true);
+    setApiError('');
     try {
       const res = await fetch('/api/polish', {
         method: 'POST',
@@ -101,6 +105,11 @@ export default function App() {
         })
       });
       const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Error al conectar con la IA');
+      }
+
       if (data.polished) {
         setPolishedResult(data.polished);
         setStats(s => ({ ...s, timeSavedMinutes: s.timeSavedMinutes + 1 }));
@@ -120,8 +129,9 @@ export default function App() {
         setHasCopied(true);
         setTimeout(() => setHasCopied(false), 2000);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error polishing:", error);
+      setApiError(error.message || 'Error desconocido');
     } finally {
       setIsPolishing(false);
     }
@@ -228,6 +238,16 @@ export default function App() {
             </div>
 
             <div className="p-8 flex-1 flex flex-col relative">
+              {errorMsg && (
+                <div className="mb-4 p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm flex items-center justify-between">
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+              {apiError && (
+                <div className="mb-4 p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm flex items-center justify-between">
+                  <span>{apiError}</span>
+                </div>
+              )}
               <AnimatePresence mode="popLayout">
                 {transcript && !polishedResult && !isPolishing && (
                   <motion.div 
