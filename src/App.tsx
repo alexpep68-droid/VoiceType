@@ -104,7 +104,14 @@ export default function App() {
           command: commandOverride
         })
       });
-      const data = await res.json();
+
+      const textRes = await res.text();
+      let data;
+      try {
+        data = JSON.parse(textRes);
+      } catch (e) {
+        throw new Error(`Error de red o servidor: ${res.status} - ${textRes.slice(0, 60)}...`);
+      }
       
       if (!res.ok) {
         throw new Error(data.error || 'Error al conectar con la IA');
@@ -127,7 +134,7 @@ export default function App() {
         // Auto copy behavior
         navigator.clipboard.writeText(data.polished);
         setHasCopied(true);
-        setTimeout(() => setHasCopied(false), 2000);
+        setTimeout(() => setHasCopied(false), 4000);
       }
     } catch (error: any) {
       console.error("Error polishing:", error);
