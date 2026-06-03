@@ -1,7 +1,7 @@
 import React from 'react';
 import { Home, History, BookA, Download, LogOut, Settings } from 'lucide-react';
 
-export type Tab = 'home' | 'history' | 'dictionary' | 'settings';
+export type Tab = 'home' | 'history' | 'dictionary' | 'settings' | 'download';
 
 interface SidebarProps {
   activeTab: Tab;
@@ -54,12 +54,12 @@ export function Sidebar({ activeTab, onTabChange, onInstallAction }: SidebarProp
 
       <div className="p-4 border-t border-slate-200">
         <div 
-          onClick={onInstallAction}
-          className="bg-white rounded-xl shadow-sm p-4 text-center border border-slate-100 cursor-pointer hover:bg-slate-50 transition"
+          onClick={() => onTabChange('download')}
+          className={`rounded-xl shadow-sm p-4 text-center border cursor-pointer hover:bg-slate-50 transition ${activeTab === 'download' ? 'bg-slate-100 border-slate-300' : 'bg-white border-slate-100'}`}
         >
           <Download className="w-6 h-6 mx-auto text-slate-400 mb-2" />
-          <h3 className="text-sm font-semibold text-slate-900 mb-1">Descargar la app</h3>
-          <p className="text-[10px] text-slate-500">Haz clic para instalar en tu dispositivo como App (PWA)</p>
+          <h3 className="text-sm font-semibold text-slate-900 mb-1">Descargar App</h3>
+          <p className="text-[10px] text-slate-500">Escritorio, Android y Web</p>
         </div>
       </div>
     </aside>

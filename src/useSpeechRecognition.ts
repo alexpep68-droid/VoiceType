@@ -25,7 +25,7 @@ export function useSpeechRecognition() {
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = 'en-US'; // Or map to browser language
+    recognition.lang = navigator.language || 'es-ES'; // Use browser language or default to Spanish
 
     recognition.onresult = (event: any) => {
       let finalTranscript = '';

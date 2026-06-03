@@ -131,11 +131,85 @@ export default function App() {
     if (text) {
       navigator.clipboard.writeText(text);
       setHasCopied(true);
-      setTimeout(() => setHasCopied(false), 2000);
+      setTimeout(() => setHasCopied(false), 4000);
     }
   };
 
   const renderContent = () => {
+    if (activeTab === 'download') {
+      return (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
+          <h2 className="text-2xl font-bold text-slate-900 font-display mb-4">Apps Nativas (Próximamente)</h2>
+          <p className="text-slate-600 mb-8 max-w-2xl leading-relaxed">
+            La versión web gratuita de VoiceType cuenta con <span className="font-semibold text-slate-800">Copiado Automático</span> (solo presiona Ctrl+V tras dictar).
+            Para obtener  inyección automática directa sin usar el teclado en tus apps (Word, Chrome, WhatsApp), 
+            estamos preparando las arquitecturas nativas.
+          </p>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="p-6 border border-slate-200 rounded-xl bg-slate-50 relative overflow-hidden">
+               <h3 className="text-lg font-bold text-slate-900 mb-3 flex items-center gap-2">
+                 🖥️ Escritorio (Mac & Windows)
+               </h3>
+               <ul className="space-y-3 text-sm text-slate-600 mb-6">
+                 <li className="flex items-start gap-2">
+                   <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
+                   <span>Aplicación ligera basada en <strong>Electron</strong>.</span>
+                 </li>
+                 <li className="flex items-start gap-2">
+                   <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
+                   <span><strong>Atajo de teclado global</strong> (ej. Cmd+E o Alt+Space) para dictar en cualquier momento.</span>
+                 </li>
+                 <li className="flex items-start gap-2">
+                   <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
+                   <span>Inyección de texto simulando pegado del sistema con <strong>permisos de Accesibilidad</strong>.</span>
+                 </li>
+               </ul>
+               <button disabled className="w-full py-2.5 bg-slate-200 text-slate-500 rounded-lg font-medium cursor-not-allowed">
+                 Arquitectura en desarrollo
+               </button>
+            </div>
+
+            <div className="p-6 border border-slate-200 rounded-xl bg-slate-50 relative overflow-hidden">
+               <h3 className="text-lg font-bold text-slate-900 mb-3 flex items-center gap-2">
+                 📱 Android (Móvil)
+               </h3>
+               <ul className="space-y-3 text-sm text-slate-600 mb-6">
+                 <li className="flex items-start gap-2">
+                   <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
+                   <span>App nativa usando <strong>Accessibility Services</strong> nativos de Android.</span>
+                 </li>
+                 <li className="flex items-start gap-2">
+                   <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
+                   <span>Detecta automáticamente qué campo de texto está activo y pega ahí mismo el texto corregido.</span>
+                 </li>
+                 <li className="flex items-start gap-2">
+                   <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
+                   <span>Integración opcional como teclado (IME) de Android.</span>
+                 </li>
+               </ul>
+               <button disabled className="w-full py-2.5 bg-slate-200 text-slate-500 rounded-lg font-medium cursor-not-allowed">
+                 Arquitectura en desarrollo
+               </button>
+            </div>
+          </div>
+          
+          <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between">
+            <div>
+               <h4 className="font-semibold text-slate-800">Usar Modo PWA (Web)</h4>
+               <p className="text-sm text-slate-500">Usa VoiceType ahora mismo como aplicación web instalable.</p>
+            </div>
+            <button 
+              onClick={handleInstallClick} 
+              className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition"
+            >
+              Instalar Web App (PWA)
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     if (activeTab === 'home') {
       return (
         <>
@@ -313,7 +387,24 @@ export default function App() {
     <div className="min-h-screen bg-[#F9FAFB] flex font-sans">
       <Sidebar activeTab={activeTab} onTabChange={setActiveTab} onInstallAction={handleInstallClick} />
       
-      <main className="flex-1 ml-64 p-8">
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {hasCopied && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            className="fixed top-8 left-1/2 ml-32 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-full font-medium shadow-xl shadow-slate-900/10 flex items-center gap-3 border border-slate-800"
+          >
+            <div className="bg-green-500 rounded-full p-1">
+              <Check className="w-3 h-3 text-slate-900 stroke-[3]" />
+            </div>
+            ¡Texto listo! Ahora pégalo con Ctrl+V donde quieras
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <main className="flex-1 ml-64 p-8 pt-20">
         <header className="flex justify-between items-center mb-8">
           <div>
              <h1 className="text-2xl text-slate-800 font-display">

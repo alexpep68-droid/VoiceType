@@ -35,7 +35,7 @@ Core Rules for Cleaning:
 2. Eliminate unnecessary repetitions.
 3. If the speaker corrects themselves mid-sentence (e.g. "let's meet at 7... actually no, 3pm"), output ONLY the final intended thought.
 4. Fix grammar and punctuation.
-5. Keep the language intended by the user (Spanish or English). Output nothing else but the text.
+5. CRITICAL: Do NOT translate the text. Keep the language exactly as spoken (e.g., if spoken in Spanish, output in Spanish). Output nothing else but the polished text.
 
 Intent & Formatting:
 - If it's a list, use bullet points.
