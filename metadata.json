@@ -1,0 +1,10 @@
+{
+  "name": "VoiceType",
+  "description": "A real-time voice dictation app that auto-edits and polishes speech into perfectly written text.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
