@@ -68,6 +68,6 @@ Intent & Formatting:
     res.status(200).json({ polished: response.text?.trim() || '' });
   } catch (error) {
     console.error("Error polishing text:", error);
-    res.status(500).json({ error: 'Failed to polish text' });
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to polish text' });
   }
 }
