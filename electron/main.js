@@ -1,23 +1,16 @@
-const { app, BrowserWindow, globalShortcut, Tray, Menu, ipcMain, nativeImage } = require('electron');
+const { app, BrowserWindow, globalShortcut, Tray, Menu, ipcMain, nativeImage, session } = require('electron');
 const path = require('path');
 const { execFile } = require('child_process');
 
-// URL of the deployed VoiceType web app. The desktop wrapper just loads this
-// page and adds OS-level integration (global shortcut + auto-paste).
 const APP_URL = 'https://voice-type-gilt.vercel.app';
 const SHORTCUT = 'Alt+Space';
 
-// Small 32x32 mic icon, embedded so the app doesn't depend on a separate
-// icon file at build time.
 const TRAY_ICON_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAlUlEQVR4nO2WMRKAIAwED8deO32D/v8p/sHSH2hFpcVdhMmE4UonMZsDAmlathuOGjyLdwAAGK2J13m8vs3rLv8nqZvwq/AfEGkJmOJKnAxQQzSA0pUSH8MBtXslL4YDHcAdwDJi2bwYDgC6C2x8HAcAvivFLfk6zir1Hoi1BB2gSQD6FFjeBG2N4loyD6JScnfAHeAB0bUkyWiQscMAAAAASUVORK5CYII=';
 
 let mainWindow;
 let tray;
 let lastForegroundWindow = null;
-
-// --- Windows-only helpers, implemented via PowerShell so no native/compiled
-// node modules are needed (keeps the build reproducible from any machine). ---
 
 function getForegroundWindowHandle(callback) {
   const ps = `
@@ -62,6 +55,28 @@ Add-Type -AssemblyName System.Windows.Forms
   });
 }
 
+// Electron blocks microphone/camera access by default unless the app
+// explicitly grants the 'media' permission. Without this, the page's
+// getUserMedia() call (used by the Web Speech API) fails silently and
+// dictation never starts.
+function allowMicrophoneAccess() {
+  const ses = session.defaultSession;
+
+  ses.setPermissionRequestHandler((webContents, permission, callback) => {
+    if (permission === 'media') {
+      callback(true);
+    } else {
+      callback(false);
+    }
+  });
+
+  if (ses.setPermissionCheckHandler) {
+    ses.setPermissionCheckHandler((webContents, permission) => {
+      return permission === 'media';
+    });
+  }
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 480,
@@ -78,7 +93,6 @@ function createWindow() {
 
   mainWindow.loadURL(APP_URL);
 
-  // Keep the app running in the tray instead of fully closing.
   mainWindow.on('close', (e) => {
     if (!app.isQuitting) {
       e.preventDefault();
@@ -105,13 +119,12 @@ function triggerToggle() {
   getForegroundWindowHandle((handle) => {
     lastForegroundWindow = handle;
     mainWindow.webContents.send('toggle-dictation');
-    // Show the window without stealing focus from the app the user was
-    // typing in, so the mic keeps listening to the right context.
     mainWindow.showInactive();
   });
 }
 
 app.whenReady().then(() => {
+  allowMicrophoneAccess();
   createWindow();
   createTray();
 
@@ -120,8 +133,6 @@ app.whenReady().then(() => {
     console.error(`No se pudo registrar el atajo global ${SHORTCUT}. Puede que otra app ya lo esté usando.`);
   }
 
-  // Renderer calls this (via preload.js) right after it copies the polished
-  // text to the clipboard, so we know it's safe to paste it back.
   ipcMain.on('dictation-done', () => {
     mainWindow.hide();
     restoreFocusAndPaste(lastForegroundWindow);
