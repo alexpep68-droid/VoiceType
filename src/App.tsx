@@ -21,6 +21,22 @@ export default function App() {
   
   const [apiError, setApiError] = useState<string>('');
 
+  const [useSpaceShortcut, setUseSpaceShortcut] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('vt_space_shortcut');
+      return saved !== 'false';
+    } catch {
+      return true;
+    }
+  });
+
+  const handleToggleSpaceShortcut = (val: boolean) => {
+    setUseSpaceShortcut(val);
+    try {
+      localStorage.setItem('vt_space_shortcut', String(val));
+    } catch {}
+  };
+
   const [stats, setStats] = useState({
     wpm: 0,
     wordsDictated: 0,
@@ -151,6 +167,63 @@ export default function App() {
       setTimeout(() => setHasCopied(false), 4000);
     }
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' || 
+        target.tagName === 'TEXTAREA' || 
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      // 1. Toggle Mic with Spacebar
+      if (e.code === 'Space' && useSpaceShortcut) {
+        e.preventDefault();
+        handleMicToggle();
+      }
+
+      // 2. Copy with 'c' or 'C' if polishedResult exists
+      if ((e.key === 'c' || e.key === 'C') && polishedResult) {
+        e.preventDefault();
+        copyToClipboard(polishedResult);
+      }
+
+      // 3. Resumir with 'r' or 'R'
+      if ((e.key === 'r' || e.key === 'R') && polishedResult && transcript) {
+        e.preventDefault();
+        polishText(transcript, "haz un resumen conciso de esto");
+      }
+
+      // 4. Traducir with 't' or 'T'
+      if ((e.key === 't' || e.key === 'T') && polishedResult && transcript) {
+        e.preventDefault();
+        polishText(transcript, "traduce esto al inglés con tono nativo");
+      }
+
+      // 5. Lista with 'l' or 'L'
+      if ((e.key === 'l' || e.key === 'L') && polishedResult && transcript) {
+        e.preventDefault();
+        polishText(transcript, "formatea esto como una lista de viñetas claras");
+      }
+
+      // 6. Clear/Reset with Escape
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (isListening) {
+          stopListening();
+        }
+        setPolishedResult('');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isListening, transcript, polishedResult, useSpaceShortcut, activeTone, dictionary]);
 
   const renderContent = () => {
     if (activeTab === 'download') {
@@ -327,7 +400,7 @@ export default function App() {
                  </div>
               )}
               
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center justify-center mt-8">
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center justify-center mt-8 gap-2">
                 <button
                   onClick={handleMicToggle}
                   className={`w-16 h-16 rounded-full flex items-center justify-center transition-all ${
@@ -339,6 +412,11 @@ export default function App() {
                   <div className={`w-6 h-6 rounded-sm ${isListening ? 'bg-white' : 'hidden'}`} />
                   <Mic className={`w-8 h-8 text-white ${isListening ? 'hidden' : 'block'}`} />
                 </button>
+                {useSpaceShortcut && (
+                  <span className="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md font-mono select-none">
+                    Atajo: [Espacio]
+                  </span>
+                )}
               </div>
             </div>
           </section>
@@ -391,10 +469,85 @@ export default function App() {
       );
     }
 
+    if (activeTab === 'settings') {
+      return (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 max-w-3xl">
+          <h2 className="text-xl font-bold text-slate-900 mb-2 font-display">Ajustes de la Aplicación</h2>
+          <p className="text-sm text-slate-500 mb-6">Configura tus atajos de teclado y opciones de dictado.</p>
+          
+          <div className="space-y-6">
+            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-800">Atajo de Barra Espaciadora</h3>
+                <p className="text-xs text-slate-500 mt-1 max-w-md">Presiona la barra espaciadora para iniciar o detener el dictado en la pantalla de inicio (solo cuando no estés escribiendo en un campo de texto).</p>
+              </div>
+              <button 
+                onClick={() => handleToggleSpaceShortcut(!useSpaceShortcut)}
+                className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-200 focus:outline-none ${
+                  useSpaceShortcut ? 'bg-slate-900' : 'bg-slate-300'
+                }`}
+              >
+                <div 
+                  className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ${
+                    useSpaceShortcut ? 'translate-x-6' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="border border-slate-200 rounded-2xl overflow-hidden">
+              <div className="bg-slate-50 px-5 py-3 border-b border-slate-200">
+                <h3 className="text-sm font-semibold text-slate-800">Guía de Atajos de Teclado rápidos</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Incrementa tu productividad con estos comandos de un solo toque.</p>
+              </div>
+              <div className="divide-y divide-slate-100 text-sm">
+                <div className="grid grid-cols-2 px-5 py-3.5 items-center bg-white">
+                  <span className="text-slate-700 font-medium">Alternar Micrófono (Iniciar/Detener)</span>
+                  <span className="flex">
+                    <kbd className="px-2.5 py-1 bg-slate-100 border border-slate-300 rounded shadow-sm text-xs font-mono font-bold text-slate-800">Espacio</kbd>
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 px-5 py-3.5 items-center bg-white">
+                  <span className="text-slate-700 font-medium">Copiar texto pulido</span>
+                  <span className="flex">
+                    <kbd className="px-2.5 py-1 bg-slate-100 border border-slate-300 rounded shadow-sm text-xs font-mono font-bold text-slate-800">C</kbd>
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 px-5 py-3.5 items-center bg-white">
+                  <span className="text-slate-700 font-medium">Volver a resumir texto</span>
+                  <span className="flex">
+                    <kbd className="px-2.5 py-1 bg-slate-100 border border-slate-300 rounded shadow-sm text-xs font-mono font-bold text-slate-800">R</kbd>
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 px-5 py-3.5 items-center bg-white">
+                  <span className="text-slate-700 font-medium">Traducir texto a Inglés</span>
+                  <span className="flex">
+                    <kbd className="px-2.5 py-1 bg-slate-100 border border-slate-300 rounded shadow-sm text-xs font-mono font-bold text-slate-800">T</kbd>
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 px-5 py-3.5 items-center bg-white">
+                  <span className="text-slate-700 font-medium">Formatear como Lista de viñetas</span>
+                  <span className="flex">
+                    <kbd className="px-2.5 py-1 bg-slate-100 border border-slate-300 rounded shadow-sm text-xs font-mono font-bold text-slate-800">L</kbd>
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 px-5 py-3.5 items-center bg-white">
+                  <span className="text-slate-700 font-medium">Limpiar pantalla / Cancelar dictado</span>
+                  <span className="flex">
+                    <kbd className="px-2.5 py-1 bg-slate-100 border border-slate-300 rounded shadow-sm text-xs font-mono font-bold text-slate-800">Esc</kbd>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col items-center justify-center py-20 text-center">
-         <h2 className="text-xl font-bold text-slate-900 mb-2">Más Configuración Próximamente</h2>
-         <p className="text-slate-500">Aquí podrás configurar atajos de teclado globales y conectores de API.</p>
+         <h2 className="text-xl font-bold text-slate-900 mb-2 font-display">Pestaña no encontrada</h2>
+         <p className="text-slate-500">Por favor, selecciona una pestaña válida.</p>
       </div>
     );
   };
