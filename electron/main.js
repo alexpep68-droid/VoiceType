@@ -1,16 +1,31 @@
-const { app, BrowserWindow, globalShortcut, Tray, Menu, ipcMain, nativeImage, session } = require('electron');
-const path = require('path');
+const { app, globalShortcut, Tray, Menu, clipboard, shell, nativeImage } = require('electron');
 const { execFile } = require('child_process');
 
+// VoiceType actually dictates inside a real browser, not inside this
+// Electron window. Reason: Electron's bundled Chromium does NOT ship
+// Google's speech-recognition backend that Chrome has, so
+// webkitSpeechRecognition silently never returns results in Electron —
+// the mic light turns on but nothing gets transcribed. Chrome/Edge (the
+// user's default browser) has the real thing, and we already confirmed
+// dictation works fine there. So this app's job is just: open the site,
+// watch the clipboard for the auto-copied result, and paste it back into
+// whatever app was focused before.
 const APP_URL = 'https://voice-type-gilt.vercel.app';
 const SHORTCUT = 'Alt+Space';
+const POLL_MS = 400;
+const MAX_ARMED_MS = 2 * 60 * 1000; // stop watching after 2 minutes idle
 
 const TRAY_ICON_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAlUlEQVR4nO2WMRKAIAwED8deO32D/v8p/sHSH2hFpcVdhMmE4UonMZsDAmlathuOGjyLdwAAGK2J13m8vs3rLv8nqZvwq/AfEGkJmOJKnAxQQzSA0pUSH8MBtXslL4YDHcAdwDJi2bwYDgC6C2x8HAcAvivFLfk6zir1Hoi1BB2gSQD6FFjeBG2N4loyD6JScnfAHeAB0bUkyWiQscMAAAAASUVORK5CYII=';
 
-let mainWindow;
 let tray;
-let lastForegroundWindow = null;
+let armed = false;
+let baselineClipboard = '';
+let targetWindowHandle = null;
+let pollTimer = null;
+let armTimeout = null;
+
+// --- Windows-only helpers via PowerShell, no native/compiled modules. ---
 
 function getForegroundWindowHandle(callback) {
   const ps = `
@@ -29,8 +44,7 @@ public class VT_Win32 {
       console.error('getForegroundWindowHandle failed', err);
       return callback(null);
     }
-    const handle = stdout.trim();
-    callback(handle || null);
+    callback(stdout.trim() || null);
   });
 }
 
@@ -46,7 +60,7 @@ public class VT_Win32b {
 }
 "@
 [VT_Win32b]::SetForegroundWindow([IntPtr]${handle}) | Out-Null
-Start-Sleep -Milliseconds 150
+Start-Sleep -Milliseconds 200
 Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.SendKeys]::SendWait("^v")
 `;
@@ -55,88 +69,85 @@ Add-Type -AssemblyName System.Windows.Forms
   });
 }
 
-// Electron blocks microphone/camera access by default unless the app
-// explicitly grants the 'media' permission. Without this, the page's
-// getUserMedia() call (used by the Web Speech API) fails silently and
-// dictation never starts.
-function allowMicrophoneAccess() {
-  const ses = session.defaultSession;
-
-  ses.setPermissionRequestHandler((webContents, permission, callback) => {
-    if (permission === 'media') {
-      callback(true);
-    } else {
-      callback(false);
-    }
-  });
-
-  if (ses.setPermissionCheckHandler) {
-    ses.setPermissionCheckHandler((webContents, permission) => {
-      return permission === 'media';
-    });
+function safeReadClipboard() {
+  try {
+    return clipboard.readText();
+  } catch (e) {
+    return '';
   }
 }
 
-function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 480,
-    height: 760,
-    show: false,
-    skipTaskbar: true,
-    autoHideMenuBar: true,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
+function updateTrayState() {
+  if (!tray) return;
+  tray.setToolTip(
+    armed
+      ? 'VoiceType — esperando el texto dictado… (Alt+Espacio para cancelar)'
+      : 'VoiceType — Alt+Espacio para dictar'
+  );
+}
 
-  mainWindow.loadURL(APP_URL);
+function disarm() {
+  armed = false;
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+  if (armTimeout) {
+    clearTimeout(armTimeout);
+    armTimeout = null;
+  }
+  updateTrayState();
+}
 
-  mainWindow.on('close', (e) => {
-    if (!app.isQuitting) {
-      e.preventDefault();
-      mainWindow.hide();
+function armAndWatch() {
+  baselineClipboard = safeReadClipboard();
+  armed = true;
+  updateTrayState();
+
+  pollTimer = setInterval(() => {
+    const current = safeReadClipboard();
+    if (current !== baselineClipboard && current.trim() !== '') {
+      disarm();
+      restoreFocusAndPaste(targetWindowHandle);
     }
+  }, POLL_MS);
+
+  armTimeout = setTimeout(disarm, MAX_ARMED_MS);
+}
+
+function triggerToggle() {
+  // Pressing the shortcut again while waiting cancels it instead of
+  // opening a second browser tab.
+  if (armed) {
+    disarm();
+    return;
+  }
+  getForegroundWindowHandle((handle) => {
+    targetWindowHandle = handle;
+    armAndWatch();
+    shell.openExternal(APP_URL);
   });
 }
 
 function createTray() {
   const icon = nativeImage.createFromDataURL(`data:image/png;base64,${TRAY_ICON_BASE64}`);
   tray = new Tray(icon);
-  tray.setToolTip('VoiceType — Alt+Espacio para dictar');
+  updateTrayState();
   const menu = Menu.buildFromTemplate([
-    { label: 'Abrir VoiceType', click: () => mainWindow.show() },
     { label: 'Dictar ahora (Alt+Espacio)', click: () => triggerToggle() },
     { type: 'separator' },
-    { label: 'Salir', click: () => { app.isQuitting = true; app.quit(); } },
+    { label: 'Salir', click: () => app.quit() },
   ]);
   tray.setContextMenu(menu);
-  tray.on('click', () => mainWindow.show());
-}
-
-function triggerToggle() {
-  getForegroundWindowHandle((handle) => {
-    lastForegroundWindow = handle;
-    mainWindow.webContents.send('toggle-dictation');
-    mainWindow.showInactive();
-  });
+  tray.on('click', () => triggerToggle());
 }
 
 app.whenReady().then(() => {
-  allowMicrophoneAccess();
-  createWindow();
   createTray();
-
   const ok = globalShortcut.register(SHORTCUT, triggerToggle);
   if (!ok) {
     console.error(`No se pudo registrar el atajo global ${SHORTCUT}. Puede que otra app ya lo esté usando.`);
   }
-
-  ipcMain.on('dictation-done', () => {
-    mainWindow.hide();
-    restoreFocusAndPaste(lastForegroundWindow);
-  });
 });
 
 app.on('will-quit', () => {
@@ -144,5 +155,6 @@ app.on('will-quit', () => {
 });
 
 app.on('window-all-closed', () => {
-  // Intentionally do nothing — VoiceType lives in the tray.
+  // Intentional no-op — VoiceType has no windows of its own, it lives in
+  // the tray and dictation happens in the user's real browser.
 });

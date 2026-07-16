@@ -1,15 +1,26 @@
 # VoiceType Desktop (Windows)
 
-Wrapper de Electron para VoiceType. Carga la app web (`voice-type-gilt.vercel.app`)
-y añade:
+App de bandeja del sistema que añade un atajo global a VoiceType.
 
-- Atajo de teclado global **Alt+Espacio** para iniciar/detener el dictado desde
-  cualquier aplicación.
-- Pegado automático: al terminar de dictar, el texto pulido (que la web ya
-  copia al portapapeles) se pega automáticamente en la app que tenías activa,
-  usando `SendKeys` de Windows vía PowerShell — sin módulos nativos de Node.
+## Cómo funciona
 
-## Compilar en tu PC (Windows, con Node.js ya instalado)
+Electron **no** incluye el motor de reconocimiento de voz que usa Chrome —
+por eso intentar escuchar el micrófono dentro de una ventana de Electron
+nunca detecta nada, aunque el permiso del micrófono esté bien concedido.
+En vez de pelear con esa limitación, esta app hace lo siguiente:
+
+1. Presionas **Alt+Espacio** en cualquier aplicación.
+2. VoiceType recuerda qué ventana tenías activa y abre
+   `voice-type-gilt.vercel.app` en tu navegador (Chrome/Edge), donde el
+   dictado sí funciona de verdad.
+3. Dictas normalmente en la pestaña del navegador. Al terminar, la web ya
+   copia el texto pulido al portapapeles automáticamente (esto no cambió).
+4. VoiceType detecta ese cambio en el portapapeles, vuelve a poner el foco
+   en la aplicación que tenías activa, y pega el texto ahí (Ctrl+V).
+5. Presiona **Alt+Espacio** de nuevo antes de terminar si quieres cancelar
+   la espera.
+
+## Compilar en tu PC (Windows, con Node.js instalado)
 
 ```
 cd electron
@@ -17,16 +28,17 @@ npm install
 npm run dist
 ```
 
-El instalador queda en `electron/dist/VoiceType Setup 0.1.0.exe`. Ejecútalo,
-y desde entonces el ícono de VoiceType vivirá en la bandeja del sistema.
+El instalador queda en `electron\dist\VoiceType Setup 0.1.0.exe`.
+
+> Si `npm run dist` falla con "Cannot create symbolic link", corre la
+> terminal como Administrador, o activa el Modo de desarrollador en
+> Configuración de Windows → Privacidad y seguridad → Para desarrolladores.
 
 ## Notas
 
-- El atajo por defecto es `Alt+Espacio`. Se eligió para evitar el conflicto
-  con `Ctrl+Alt+Shift`, que Windows usa para cambiar el idioma del teclado en
-  máquinas con más de un idioma instalado. Se puede cambiar editando la
-  constante `SHORTCUT` en `main.js`.
-- Requiere que `src/App.tsx` tenga el puente `window.voicetypeDesktop`
-  (agregado en este mismo cambio) para que el atajo global controle el
-  micrófono y para que la app avise cuándo el texto ya está en el
-  portapapeles.
+- El atajo por defecto es `Alt+Espacio` (constante `SHORTCUT` en
+  `main.js`), elegido para evitar el conflicto de `Ctrl+Alt+Shift` con el
+  cambio de idioma de teclado de Windows.
+- No hay ninguna ventana propia de la app: vive solo en la bandeja del
+  sistema. `preload.js` queda en el repo mas no se usa por este diseño
+  (era para un intento anterior de dictar dentro de Electron).
