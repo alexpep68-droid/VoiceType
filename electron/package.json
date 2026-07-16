@@ -1,0 +1,30 @@
+{
+  "name": "voicetype-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "VoiceType desktop wrapper: global shortcut + auto-paste for the VoiceType web app.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^31.3.1",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.alexpep68.voicetype",
+    "productName": "VoiceType",
+    "files": [
+      "main.js",
+      "preload.js"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
